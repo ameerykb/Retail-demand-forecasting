@@ -1,0 +1,7 @@
+# Minimal packages for the serving container (no PyTorch / MLflow needed)
+numpy
+pandas
+scikit-learn
+lightgbm
+fastapi
+uvicorn

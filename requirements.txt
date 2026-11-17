@@ -1,0 +1,13 @@
+numpy
+pandas
+matplotlib
+pytest
+scikit-learn
+lightgbm
+torch
+mlflow
+fastapi
+uvicorn
+httpx
+streamlit
+requests

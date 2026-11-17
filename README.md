@@ -16,7 +16,7 @@ A **sales forecasting system** that predicts daily sales for **1,115 Rossmann dr
 ![Streamlit](https://img.shields.io/badge/Streamlit-Demo-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Container-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
-<!-- Add a real CI status badge here once the first GitHub Actions run passes. -->
+[![CI](https://github.com/ameerykb/Retail-demand-forecasting/actions/workflows/ci.yml/badge.svg)](https://github.com/ameerykb/Retail-demand-forecasting/actions/workflows/ci.yml)
 
 **[Results](#-results) · [Data insights](#-what-the-data-shows) · [Architecture](#-system-architecture) · [Features](#-key-features) · [Tech Stack](#-technology-stack) · [Getting Started](#-getting-started) · [Testing](#-testing)**
 

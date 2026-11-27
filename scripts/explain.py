@@ -50,16 +50,26 @@ def main(max_rows: int = 50_000):
     imp = shap_importance(model, X)
 
     config.FIGURES.mkdir(parents=True, exist_ok=True)
-    fig, ax = plt.subplots(figsize=(8, 5.5))
-    ax.barh([label(c) for c in imp.index], imp.to_numpy(), color="#2563eb")
-    ax.set_xlabel("mean |SHAP value|  (impact on log sales)")
-    ax.set_title(f"What drives the forecast ({source}, last {config.HORIZON} days)")
-    plt.tight_layout()
-    out = config.FIGURES / "shap_importance.png"
-    plt.savefig(out, dpi=130)
-    plt.close()
+    plot_importance(imp.rename(label), config.FIGURES / "shap_importance.png",
+                    f"Data: {source}, last {config.HORIZON} days (not seen in training)")
     print(imp.sort_values(ascending=False).rename(label).round(4).to_string())
-    print(f"\nSaved {out}")
+    print(f"\nSaved {config.FIGURES / 'shap_importance.png'}")
+
+
+def plot_importance(imp: pd.Series, out, subtitle: str = ""):
+    """Horizontal bar chart of mean |SHAP| (imp is indexed by readable labels)."""
+    imp = imp.sort_values()
+    fig, ax = plt.subplots(figsize=(9, 6))
+    ax.barh(imp.index, imp.to_numpy(), color="#2563eb")
+    ax.set_xlabel("mean |SHAP value|  (impact on log sales)")
+    fig.suptitle("What drives the forecast", x=0.02, ha="left", fontsize=14, fontweight="bold")
+    if subtitle:
+        ax.set_title(subtitle, loc="left", fontsize=10, color="#555555")
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    fig.tight_layout()
+    fig.savefig(out, dpi=130)
+    plt.close(fig)
 
 
 if __name__ == "__main__":

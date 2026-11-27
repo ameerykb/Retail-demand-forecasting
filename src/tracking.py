@@ -20,6 +20,6 @@ def log_results_to_mlflow(results, params_by_model=None, curves_by_model=None,
             mlflow.log_metrics({"MAE": g["MAE"].mean(), "RMSE": g["RMSE"].mean(),
                                 "WAPE": g["WAPE"].mean()})   # averages across folds
             for fold, curve in enumerate(curves_by_model.get(model, [])):
-                for epoch, (tl, vl) in enumerate(zip(curve["train_loss"], curve["val_loss"])):
+                for epoch, (tl, vl) in enumerate(zip(curve["train_loss"], curve["val_loss"], strict=True)):
                     mlflow.log_metric(f"fold{fold}_train_loss", tl, step=epoch)
                     mlflow.log_metric(f"fold{fold}_val_loss", vl, step=epoch)

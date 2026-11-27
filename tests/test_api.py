@@ -107,3 +107,8 @@ def test_app_without_model_returns_503(tmp_path):
     with TestClient(create_app(str(tmp_path / "missing"))) as c:
         assert c.get("/health").status_code == 503
         assert c.get("/forecast/1/default").status_code == 503
+
+
+def test_root_redirects_to_docs(client):
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code == 307 and r.headers["location"] == "/docs"

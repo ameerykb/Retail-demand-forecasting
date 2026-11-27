@@ -290,11 +290,13 @@ flowchart LR
     GH -->|update-function-code| L
 ```
 
-**What Terraform creates** (`infra/terraform/`): a private, encrypted S3 bucket for the model; an ECR repository that keeps the last 3 images; the Lambda function with a least-privilege role (it can only read the model files); the HTTP API with throttling; 7-day log retention; a monthly AWS Budget with email alerts; and an IAM role that only this repository's `main` branch can assume from GitHub Actions.
+**What Terraform creates** (`infra/terraform/`): a private, encrypted S3 bucket for the model; an ECR repository that keeps the last 3 images; the Lambda function with a least-privilege role (it can only read the model files); the HTTP API with throttling; 7-day log retention; a monthly AWS Budget with email alerts; and, optionally, an IAM role that only this repository's `main` branch can assume from GitHub Actions.
 
 **Cost safety:** pick the **Free plan** when you create the AWS account, set `budget_email`, and avoid NAT gateways, RDS and SageMaker endpoints. Lambda and API Gateway only cost anything when called, and the throttling caps how fast anyone can call them. `terraform destroy` removes everything.
 
-**First deploy** (needs the AWS CLI, Terraform and Docker; region `ap-south-1` / Mumbai by default):
+> **AWS Free plan (project-based sign-up):** AWS limits these accounts to their project's own region (plus a few services in us-east-1 / us-west-2) and blocks identity-provider changes. Set `region` in `terraform.tfvars` to your project's region (for example `ap-southeast-2`), use the same region in `aws configure`, and deploy from your laptop; the GitHub deploy button needs a Paid plan (`enable_github_deploy = true`). Errors that mention *"explicit deny in a service control policy"* come from these limits.
+
+**First deploy** (needs the AWS CLI, Terraform and Docker; set `REGION` to the region in your `terraform.tfvars`):
 
 ```bash
 # 1. Train the model locally on the Kaggle data
@@ -312,7 +314,7 @@ aws s3 sync models/forecaster "$(terraform -chdir=infra/terraform output -raw mo
 
 # 4. Build and push the Lambda image
 REPO=$(terraform -chdir=infra/terraform output -raw ecr_repository_url)
-aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin "${REPO%%/*}"
+aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "${REPO%%/*}"
 docker buildx build --platform linux/amd64 --provenance=false -f Dockerfile.lambda -t "$REPO:latest" --push .
 
 # 5. Create everything else, then try it
@@ -322,7 +324,7 @@ curl "$(terraform -chdir=infra/terraform output -raw api_url)/health"
 
 Open `<api_url>/docs` for the interactive Swagger page. To point the Streamlit demo at the cloud API, set `API_URL` to the same address.
 
-**Later deploys** go through GitHub Actions: add the repository variables `AWS_REGION`, `AWS_ROLE_ARN` (`github_deploy_role_arn` output), `ECR_REPOSITORY_URL`, `LAMBDA_FUNCTION` and `API_URL` (all printed by `terraform output`), then run **Deploy to AWS** from the Actions tab. It signs in with OIDC, pushes a new image tagged with the commit, updates the function and smoke-tests the live URL.
+**Later deploys** go through GitHub Actions (Paid plan, with `enable_github_deploy = true`): add the repository variables `AWS_REGION`, `AWS_ROLE_ARN` (`github_deploy_role_arn` output), `ECR_REPOSITORY_URL`, `LAMBDA_FUNCTION` and `API_URL` (all printed by `terraform output`), then run **Deploy to AWS** from the Actions tab. It signs in with OIDC, pushes a new image tagged with the commit, updates the function and smoke-tests the live URL.
 
 **After retraining**, only the model changes: run step 3 again. A warm Lambda keeps its copy, so publish a new image (or wait for new containers) to pick it up.
 

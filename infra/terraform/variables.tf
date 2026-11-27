@@ -1,5 +1,5 @@
 variable "region" {
-  description = "AWS region (ap-south-1 = Mumbai)"
+  description = "AWS region. On the Free plan (project-based sign-up) only your project's own region works: check it in the console."
   type        = string
   default     = "ap-south-1"
 }
@@ -48,6 +48,12 @@ variable "github_repo" {
   description = "owner/name of the GitHub repository allowed to deploy"
   type        = string
   default     = "ameerykb/Retail-demand-forecasting"
+}
+
+variable "enable_github_deploy" {
+  description = "Create the GitHub OIDC deploy role. Needs a Paid plan: the Free plan blocks identity-provider changes."
+  type        = bool
+  default     = false
 }
 
 variable "create_github_oidc_provider" {

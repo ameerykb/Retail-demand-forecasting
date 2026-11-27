@@ -1,4 +1,10 @@
 # Copy to terraform.tfvars (git-ignored) and edit.
+
+# Free plan (project-based sign-up): use your project's own region, e.g. "ap-southeast-2"
+# (Sydney). Other regions are blocked by AWS. Paid plan: any region, e.g. "ap-south-1".
 region       = "ap-south-1"
 budget_email = "you@example.com"
+
+# GitHub Actions deploy button (needs a Paid plan):
+# enable_github_deploy        = true
 # create_github_oidc_provider = false   # if your account already has it

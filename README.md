@@ -258,7 +258,7 @@ Retail-demand-forecasting/
 
 ## ⚡ Getting started
 
-**Requirements:** Python 3.12 (3.11+ works). Docker is optional.
+**Requirements:** Python 3.12 or newer (the pinned packages need it; Lambda and CI use 3.12). Docker is optional.
 
 **Data:** the Kaggle data is **not** included. Download `train.csv` and `store.csv` from [Rossmann Store Sales](https://www.kaggle.com/c/rossmann-store-sales) (subject to its rules) into `data/`. Without them, every script falls back to **synthetic data** so the pipeline still runs; never quote results from synthetic data.
 

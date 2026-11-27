@@ -1,10 +1,10 @@
 import numpy as np
 from src.data.synthetic import make_rossmann_like
 from src.data.rossmann import standardize_rossmann
-from src.data.load import to_wide
+from src.data.rossmann import to_wide
 from src.features.build import make_features
 from src.models.gbm import train_lgbm, predict_lgbm
-from src.training.backtest_gbm import rolling_backtest_gbm
+from src.training.backtest import rolling_backtest_gbm
 
 H = 42
 

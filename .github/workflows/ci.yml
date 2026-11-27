@@ -44,3 +44,49 @@ jobs:
       - name: Show container logs on failure
         if: failure()
         run: docker logs api
+
+  lambda-image:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Train a model on synthetic data
+        run: |
+          pip install -r requirements-api.txt
+          python train_final.py --synthetic
+      - name: Build the Lambda image
+        run: docker build -f Dockerfile.lambda -t demand-forecast-lambda .
+      - name: Smoke test with the Lambda Runtime Interface Emulator
+        run: |
+          # The AWS base image ships the emulator: it exposes the Lambda "invoke" API on port 8080
+          docker run -d --name fn -p 9000:8080 -e MODEL_DIR=/models/forecaster \
+            -v "$PWD/models:/models:ro" demand-forecast-lambda
+          URL=http://localhost:9000/2015-03-31/functions/function/invocations
+          for i in $(seq 1 30); do curl -fs -o /dev/null -d '{}' "$URL" && break; sleep 2; done
+          for ev in health forecast_default; do
+            out=$(curl -fs -d @infra/events/$ev.json "$URL")
+            echo "$ev -> $out"
+            [ "$(echo "$out" | jq .statusCode)" = "200" ]
+          done
+          curl -fs -d @infra/events/forecast_default.json "$URL" | jq -e '.body | fromjson | .forecasts | length == 7'
+      - name: Show container logs on failure
+        if: failure()
+        run: docker logs fn
+
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: Format check
+        run: terraform fmt -check -recursive
+      - name: Validate
+        run: |
+          terraform init -backend=false
+          terraform validate

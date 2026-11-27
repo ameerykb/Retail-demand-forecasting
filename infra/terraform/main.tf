@@ -36,6 +36,28 @@ resource "aws_s3_bucket_public_access_block" "model" {
   restrict_public_buckets = true
 }
 
+# Every upload of a retrained model keeps the previous one, so a bad model can be
+# rolled back; old versions are deleted after 30 days to keep storage tiny.
+resource "aws_s3_bucket_versioning" "model" {
+  bucket = aws_s3_bucket.model.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "model" {
+  bucket     = aws_s3_bucket.model.id
+  depends_on = [aws_s3_bucket_versioning.model]
+  rule {
+    id     = "expire-old-model-versions"
+    status = "Enabled"
+    filter {}
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+  }
+}
+
 resource "aws_s3_bucket_server_side_encryption_configuration" "model" {
   bucket = aws_s3_bucket.model.id
   rule {

@@ -1,7 +1,9 @@
-# Minimal packages for the serving container (no PyTorch / MLflow needed)
-numpy
-pandas
-scikit-learn
-lightgbm
-fastapi
-uvicorn
+# Serving only (Docker / Lambda images): no PyTorch, MLflow or plotting.
+# Versions are pinned so a rebuild installs exactly what the model was trained and tested with.
+numpy==2.5.3
+pandas==3.0.5
+scikit-learn==1.9.1
+lightgbm==4.7.0
+fastapi==0.165.0
+pydantic==2.13.5
+uvicorn==0.54.0

@@ -1,14 +1,12 @@
-numpy
-pandas
-matplotlib
-pytest
-scikit-learn
-lightgbm
-torch
-mlflow
-fastapi
-uvicorn
-httpx
-streamlit
-requests
-mangum
+# Everything for development: training, experiments, tests, the demo.
+-r requirements-lambda.txt
+torch==2.15.0
+mlflow==3.18.0
+optuna==5.1.0
+matplotlib==3.11.2
+streamlit==1.67.0
+requests==2.34.2
+httpx==0.29.0
+pytest==9.1.1
+ruff==0.17.6
+pre-commit==4.7.0

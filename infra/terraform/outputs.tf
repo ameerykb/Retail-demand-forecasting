@@ -20,6 +20,6 @@ output "lambda_function_name" {
 }
 
 output "github_deploy_role_arn" {
-  description = "Put this in the GitHub repo variable AWS_ROLE_ARN"
-  value       = aws_iam_role.github_deploy.arn
+  description = "Put this in the GitHub repo variable AWS_ROLE_ARN (only when enable_github_deploy = true)"
+  value       = var.enable_github_deploy ? aws_iam_role.github_deploy[0].arn : null
 }

@@ -8,3 +8,10 @@ mlruns/
 mlflow.db
 *.pt
 .venv/
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl

@@ -3,9 +3,9 @@ Interactive docs: http://localhost:8000/docs"""
 import datetime as dt
 import os
 from contextlib import asynccontextmanager
-from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
+from src.api.model_store import load_forecaster
 from src.api.schemas import (DayForecast, ErrorResponse, ForecastRequest, ForecastResponse,
                              HealthResponse, ModelInfo)
 from src.api.service import DateOutOfRange, Forecaster, StoreNotFound
@@ -20,7 +20,8 @@ def create_app(model_dir: str | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         # the model is loaded ONCE at startup, not on every request
-        app.state.forecaster = Forecaster.load(model_dir) if Path(model_dir).exists() else None
+        # (from disk, or from S3 first when MODEL_S3_URI is set)
+        app.state.forecaster = load_forecaster(model_dir)
         yield
 
     app = FastAPI(title="Demand Forecast API", version="1.0.0", lifespan=lifespan,

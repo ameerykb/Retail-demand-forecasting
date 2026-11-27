@@ -18,6 +18,7 @@ import streamlit as st
 
 from src.demo.schedule import default_schedule, forecasts_to_frame, schedule_to_payload
 
+DATE_AXIS = alt.Axis(format="%a %d %b", labelAngle=-45)   # e.g. "Sat 01 Aug" for every tick
 LIVE_API = "https://hgdnakicif.execute-api.ap-southeast-2.amazonaws.com"
 REPO = "https://github.com/ameerykb/Retail-demand-forecasting"
 
@@ -122,7 +123,8 @@ if st.button("Forecast", type="primary"):
     layers = []
     if has_range:
         layers.append(alt.Chart(main).mark_area(opacity=0.25, color="#2563eb").encode(
-            x="date:T", y=alt.Y("lower:Q", title="Sales"), y2="upper:Q",
+            x=alt.X("date:T", title=None, axis=DATE_AXIS), y=alt.Y("lower:Q", title="Sales"),
+            y2="upper:Q",
             tooltip=[alt.Tooltip("date:T"), alt.Tooltip("lower:Q", format=",.0f"),
                      alt.Tooltip("upper:Q", format=",.0f")]))
     lines = main.assign(series="Your schedule")[["date", "predicted_sales", "series"]]
@@ -130,9 +132,11 @@ if st.button("Forecast", type="primary"):
         lines = pd.concat([lines, base.assign(series="No promotions")[
             ["date", "predicted_sales", "series"]]])
     layers.append(alt.Chart(lines).mark_line(point=True).encode(
-        x=alt.X("date:T", title=None), y=alt.Y("predicted_sales:Q", title="Sales"),
+        x=alt.X("date:T", title=None, axis=DATE_AXIS), y=alt.Y("predicted_sales:Q", title="Sales"),
+        # explicit domain: "Your schedule" is always blue like its range band
         color=alt.Color("series:N", title=None,
-                        scale=alt.Scale(range=["#2563eb", "#9ca3af"])),
+                        scale=alt.Scale(domain=["Your schedule", "No promotions"],
+                                        range=["#2563eb", "#9ca3af"])),
         tooltip=[alt.Tooltip("date:T"), "series:N",
                  alt.Tooltip("predicted_sales:Q", format=",.0f")]))
     st.altair_chart(alt.layer(*layers).properties(height=360), width="stretch")

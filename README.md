@@ -6,7 +6,7 @@
 
 Forecasts daily sales for **1,115 Rossmann drugstores, up to 42 days ahead**, with an 80% range, and serves them through a **live API on AWS Lambda** and an interactive demo.
 
-🌐 **[Live API](https://hgdnakicif.execute-api.ap-southeast-2.amazonaws.com)** (interactive docs) &nbsp;·&nbsp; 📄 **[Deployment guide](docs/deploy-aws.md)** &nbsp;·&nbsp; 📝 **[Changelog](CHANGELOG.md)**
+🚀 **[Live demo](https://retail-demand-forecasting-93eujwpzasnqbm9b9nqd7e.streamlit.app/)** &nbsp;·&nbsp; 🌐 **[Live API](https://hgdnakicif.execute-api.ap-southeast-2.amazonaws.com)** (interactive docs) &nbsp;·&nbsp; 📄 **[Deployment guide](docs/deploy-aws.md)** &nbsp;·&nbsp; 📝 **[Changelog](CHANGELOG.md)**
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![LightGBM](https://img.shields.io/badge/LightGBM-Gradient%20Boosting-1C7C54?style=for-the-badge)
@@ -45,6 +45,8 @@ Forecasts daily sales for **1,115 Rossmann drugstores, up to 42 days ahead**, wi
 > **Scope:** the model is trained on historical Kaggle data (2013 to July 2015) and served live on AWS as a demo, so its forecasts cover August–September 2015. Results describe this dataset and this backtest only.
 
 ## 🖥️ Demo
+
+**[Open the live demo](https://retail-demand-forecasting-93eujwpzasnqbm9b9nqd7e.streamlit.app/)** (hosted on Streamlit Community Cloud; the first load can take ~20 s while the app and the AWS Lambda wake up).
 
 An interactive **Streamlit** page: pick a store, edit the schedule (promotion days, closed days, holidays), and see the forecast with its range, optionally next to the same days without promotions. It calls the API; see [hosting it on Streamlit Community Cloud](docs/streamlit-cloud.md).
 

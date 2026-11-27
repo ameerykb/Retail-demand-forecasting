@@ -1,14 +1,25 @@
 """FastAPI app. Run with:  uvicorn src.api.main:app --reload
 Interactive docs: http://localhost:8000/docs"""
 import datetime as dt
+import json
+import logging
 import os
+import time
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from src.api.model_store import load_forecaster
 from src.api.schemas import (DayForecast, ErrorResponse, ForecastRequest, ForecastResponse,
                              HealthResponse, ModelInfo)
 from src.api.service import DateOutOfRange, Forecaster, StoreNotFound
+
+log = logging.getLogger("demand_forecast_api")
+log.setLevel(logging.INFO)
+if not log.handlers:            # one JSON line per request; on Lambda it lands in CloudWatch
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter("%(message)s"))
+    log.addHandler(_h)
+    log.propagate = False
 
 ERRORS = {404: {"model": ErrorResponse}, 422: {"model": ErrorResponse},
           503: {"model": ErrorResponse}}
@@ -27,9 +38,19 @@ def create_app(model_dir: str | None = None) -> FastAPI:
     app = FastAPI(title="Demand Forecast API", version="1.0.0", lifespan=lifespan,
                   description="Forecasts daily sales for Rossmann-style stores up to 42 days ahead.")
 
+    @app.middleware("http")
+    async def log_requests(request: Request, call_next):
+        start = time.perf_counter()
+        response = await call_next(request)
+        log.info(json.dumps({
+            "event": "request", "method": request.method, "path": request.url.path,
+            "status": response.status_code,
+            "duration_ms": round((time.perf_counter() - start) * 1000, 1)}))
+        return response
+
     def forecaster() -> Forecaster:
         if app.state.forecaster is None:
-            raise HTTPException(503, "Model not loaded. Train one with: python train_final.py")
+            raise HTTPException(503, "Model not loaded. Train one with: python -m scripts.train_final")
         return app.state.forecaster
 
     def run(store: int, days: list[dict]) -> ForecastResponse:
@@ -37,14 +58,13 @@ def create_app(model_dir: str | None = None) -> FastAPI:
         try:
             out = fc.forecast(store, days)
         except StoreNotFound as e:
-            raise HTTPException(404, str(e))
+            raise HTTPException(404, str(e)) from e
         except DateOutOfRange as e:
-            raise HTTPException(422, str(e))
+            raise HTTPException(422, str(e)) from e
         return ForecastResponse(
             store=store, model_version=fc.meta["model_version"],
             last_history_date=fc.last_date.date(),
-            forecasts=[DayForecast(date=r.date, predicted_sales=r.predicted_sales)
-                       for r in out.itertuples()])
+            forecasts=[DayForecast(**rec) for rec in out.to_dict("records")])
 
     @app.get("/", include_in_schema=False)
     def root():
@@ -66,7 +86,9 @@ def create_app(model_dir: str | None = None) -> FastAPI:
                          horizon_days=fc.horizon, last_history_date=fc.last_date.date(),
                          forecast_window_start=lo.date(), forecast_window_end=hi.date(),
                          n_stores=len(fc.store_ids), trained_on=m["trained_on"],
-                         backtest_wape=m.get("backtest_wape"), features=fc.feature_cols)
+                         backtest_wape=m.get("backtest_wape"), params=m.get("params", "default"),
+                         interval=list(fc.interval) if fc.interval else None,
+                         store_ids=fc.store_ids, features=fc.feature_cols)
 
     @app.post("/forecast", response_model=ForecastResponse, responses=ERRORS)
     def forecast(req: ForecastRequest):

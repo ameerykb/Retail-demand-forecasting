@@ -21,8 +21,10 @@ def setup(tmp_path_factory):
     df_all, cols = make_features(raw, horizon=H)
     model = train_lgbm(df_all[df_all["date"] < cutoff], cols, SMALL)
     out = tmp_path_factory.mktemp("bundle") / "forecaster"
+    train = df_all[df_all["date"] < cutoff]
+    qmodels = {q: train_lgbm(train, cols, SMALL, quantile=q) for q in (0.1, 0.9)}
     save_bundle(model, cols, raw[raw["date"] < cutoff], H, out, trained_on="synthetic-test",
-                backtest_wape=0.09)
+                backtest_wape=0.09, quantile_models=qmodels)
     return {"dir": str(out), "raw": raw, "df_all": df_all, "cols": cols,
             "model": model, "cutoff": cutoff}
 
@@ -112,3 +114,39 @@ def test_app_without_model_returns_503(tmp_path):
 def test_root_redirects_to_docs(client):
     r = client.get("/", follow_redirects=False)
     assert r.status_code == 307 and r.headers["location"] == "/docs"
+
+
+def test_model_info_lists_stores_and_interval(client):
+    info = client.get("/model-info").json()
+    assert info["store_ids"] == [1, 2, 3, 4, 5, 6]
+    assert info["interval"] == [0.1, 0.9]
+
+
+def test_forecast_has_ordered_interval(client, setup):
+    out = client.post("/forecast", json={"store": 4, "days": _days(setup, 4)}).json()["forecasts"]
+    for f in out:
+        assert f["lower"] <= f["predicted_sales"] <= f["upper"]
+        if f["predicted_sales"] == 0:
+            assert f["lower"] == f["upper"] == 0
+
+
+def test_requests_are_logged_as_json(client, caplog):
+    import json
+    import logging
+    logger = logging.getLogger("demand_forecast_api")
+    logger.addHandler(caplog.handler)
+    try:
+        client.get("/health")
+    finally:
+        logger.removeHandler(caplog.handler)
+    entry = json.loads(caplog.records[-1].getMessage())
+    assert entry["path"] == "/health" and entry["status"] == 200 and entry["duration_ms"] >= 0
+
+
+def test_bundle_without_intervals_still_works(setup, tmp_path):
+    out = save_bundle(setup["model"], setup["cols"], setup["raw"][setup["raw"]["date"] < setup["cutoff"]],
+                      H, tmp_path / "plain")
+    with TestClient(create_app(str(out))) as c:
+        assert c.get("/model-info").json()["interval"] is None
+        f = c.get("/forecast/1/default?n_days=3").json()["forecasts"][0]
+        assert f["lower"] is None and f["upper"] is None

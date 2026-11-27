@@ -2,7 +2,8 @@
 
 Hosted:  Streamlit Community Cloud, calling the live API on AWS Lambda.
 Locally: streamlit run app/streamlit_app.py
-         (set API_URL=http://127.0.0.1:8010 to use a local API instead of AWS)
+         (set the environment variable API_URL=http://127.0.0.1:8010 to use a local API;
+          on Streamlit Cloud, set API_URL in the app's secrets)
 """
 import os
 import sys
@@ -62,17 +63,17 @@ st.markdown(
 st.caption("Trained on Kaggle's historical Rossmann data (2013 to July 2015), so forecasts "
            "start in August 2015. A portfolio demo, not a production system.")
 
+# The API address comes only from the app's secrets / environment, never from visitors:
+# a free-text URL box would let anyone make this server send requests to any address (SSRF).
+api_url = default_api_url().rstrip("/")
 with st.sidebar:
     st.header("Model")
-    with st.expander("Advanced: API address"):
-        api_url = st.text_input("API address", default_api_url()).rstrip("/")
 
 try:
     with st.spinner("Waking up the model on AWS (the first request can take ~20 seconds)..."):
         info = get_info(api_url)
-except Exception as e:
-    st.error(f"Could not reach the API at {api_url}. Please refresh in a few seconds.")
-    st.caption(str(e))
+except Exception:
+    st.error("Could not reach the forecasting API. Please refresh in a few seconds.")
     st.stop()
 
 last_date = pd.Timestamp(info["last_history_date"]).date()
@@ -105,7 +106,11 @@ if st.button("Forecast", type="primary"):
         r = call_api("POST", f"{api_url}/forecast",
                      json=schedule_to_payload(store, sched, no_promo))
         if r.status_code != 200:
-            st.error(f"API error {r.status_code}: {r.json().get('detail', r.text)}")
+            try:
+                detail = r.json().get("detail", "")
+            except ValueError:
+                detail = ""
+            st.error(f"The API could not make this forecast ({r.status_code}). {detail}")
             st.stop()
         return forecasts_to_frame(r.json())
 

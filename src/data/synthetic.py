@@ -3,7 +3,7 @@
 Why this exists: lets the whole pipeline (and CI tests) run without
 downloading a dataset. It has the same patterns real retail data has:
 weekly seasonality, yearly seasonality, a trend, promotions and noise.
-Swap in the real Rossmann data later via src/data/load.py.
+Real data is loaded by src/data/rossmann.py when data/train.csv exists.
 """
 import numpy as np
 import pandas as pd

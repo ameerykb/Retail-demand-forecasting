@@ -14,3 +14,9 @@ def wape(y_true, y_pred) -> float:
     Preferred over MAPE in retail because it is safe when actuals are 0."""
     y_true, y_pred = np.asarray(y_true), np.asarray(y_pred)
     return float(np.abs(y_true - y_pred).sum() / np.abs(y_true).sum())
+
+
+def interval_coverage(y_true, lower, upper) -> float:
+    """Share of actual values that fall inside [lower, upper]."""
+    y = np.asarray(y_true)
+    return float(np.mean((y >= np.asarray(lower)) & (y <= np.asarray(upper))))

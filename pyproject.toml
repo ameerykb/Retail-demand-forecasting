@@ -1,0 +1,28 @@
+[project]
+name = "retail-demand-forecasting"
+version = "1.0.0"
+description = "Daily sales forecasting for 1,115 Rossmann stores: leak-free backtest, LightGBM vs PyTorch, FastAPI on AWS Lambda."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Ameer Yakoob M T" }]
+
+[tool.setuptools.packages.find]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# pyflakes + pycodestyle errors, bugbear (likely bugs), pyupgrade (modern syntax), simplify
+select = ["E4", "E7", "E9", "F", "B", "UP", "SIM"]
+ignore = ["SIM108"]   # ternaries are not always clearer
+
+[tool.ruff.lint.per-file-ignores]
+"app/streamlit_app.py" = ["E402"]

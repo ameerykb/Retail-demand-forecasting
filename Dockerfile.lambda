@@ -1,0 +1,16 @@
+# Image for AWS Lambda (the plain Dockerfile is for Docker Compose / any container host).
+# Built on the official AWS base image, which already contains boto3 and the
+# Runtime Interface Emulator used for local testing (see README).
+FROM public.ecr.aws/lambda/python:3.12
+
+# LightGBM needs the OpenMP runtime library
+RUN dnf install -y libgomp && dnf clean all
+
+COPY requirements-api.txt requirements-lambda.txt ./
+RUN pip install --no-cache-dir -r requirements-lambda.txt
+
+# Code only. On AWS the trained model is downloaded from S3 (MODEL_S3_URI) at cold start.
+COPY src ${LAMBDA_TASK_ROOT}/src
+
+ENV MODEL_DIR=/tmp/forecaster
+CMD ["src.api.lambda_handler.handler"]

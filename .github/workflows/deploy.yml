@@ -1,0 +1,54 @@
+name: Deploy to AWS
+
+# Manual on purpose: run it from the Actions tab when you want to ship.
+# Needs the AWS resources from infra/terraform and these repository variables
+# (Settings -> Secrets and variables -> Actions -> Variables):
+#   AWS_REGION, AWS_ROLE_ARN, ECR_REPOSITORY_URL, LAMBDA_FUNCTION, API_URL
+# No AWS keys are stored in GitHub: the job signs in with OIDC.
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # needed for the OIDC sign-in
+  contents: read
+
+concurrency: deploy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push the Lambda image
+        env:
+          REPO: ${{ vars.ECR_REPOSITORY_URL }}
+        run: |
+          # Lambda rejects multi-platform manifests, so build a single linux/amd64 image
+          docker buildx build --platform linux/amd64 --provenance=false \
+            -f Dockerfile.lambda -t "$REPO:${GITHUB_SHA::12}" -t "$REPO:latest" --push .
+
+      - name: Point the function at the new image
+        env:
+          REPO: ${{ vars.ECR_REPOSITORY_URL }}
+          FN: ${{ vars.LAMBDA_FUNCTION }}
+        run: |
+          aws lambda update-function-code --function-name "$FN" \
+            --image-uri "$REPO:${GITHUB_SHA::12}" > /dev/null
+          aws lambda wait function-updated-v2 --function-name "$FN"
+
+      - name: Smoke test the live API
+        env:
+          API: ${{ vars.API_URL }}
+        run: |
+          # first call can be a cold start (model download from S3), so allow a few tries
+          for i in $(seq 1 5); do curl -fs "$API/health" && break; sleep 5; done
+          curl -fs "$API/model-info"
+          curl -fs "$API/forecast/1/default?n_days=7"

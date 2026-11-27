@@ -4,7 +4,7 @@ import datetime as dt
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from src.api.model_store import load_forecaster
 from src.api.schemas import (DayForecast, ErrorResponse, ForecastRequest, ForecastResponse,
                              HealthResponse, ModelInfo)
@@ -45,6 +45,11 @@ def create_app(model_dir: str | None = None) -> FastAPI:
             last_history_date=fc.last_date.date(),
             forecasts=[DayForecast(date=r.date, predicted_sales=r.predicted_sales)
                        for r in out.itertuples()])
+
+    @app.get("/", include_in_schema=False)
+    def root():
+        """The bare address opens the interactive docs."""
+        return RedirectResponse("/docs")
 
     @app.get("/health", response_model=HealthResponse, responses={503: {"model": HealthResponse}})
     def health():

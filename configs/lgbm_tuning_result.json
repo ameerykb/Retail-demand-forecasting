@@ -1,0 +1,18 @@
+{
+  "params": {
+    "learning_rate": 0.03448294205662944,
+    "n_estimators": 1500,
+    "num_leaves": 101,
+    "min_child_samples": 140,
+    "subsample": 0.6909007503921312,
+    "colsample_bytree": 0.5539586030920628,
+    "reg_lambda": 0.019261555021549234
+  },
+  "tuning_wape": 0.1032,
+  "default_wape": 0.1082,
+  "trials": 25,
+  "folds": 2,
+  "stores": 300,
+  "data": "Rossmann Store Sales (Kaggle)",
+  "created": "2026-11-27"
+}

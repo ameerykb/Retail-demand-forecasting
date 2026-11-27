@@ -1,5 +1,7 @@
 # Hosting the demo on Streamlit Community Cloud
 
+Live: https://retail-demand-forecasting-93eujwpzasnqbm9b9nqd7e.streamlit.app/
+
 The demo (`app/streamlit_app.py`) only calls the API, so it is light and free to host.
 
 1. Sign in at [share.streamlit.io](https://share.streamlit.io) with GitHub.

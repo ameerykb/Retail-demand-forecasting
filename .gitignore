@@ -15,3 +15,4 @@ mlflow.db
 *.tfvars
 !*.tfvars.example
 .terraform.lock.hcl
+.ruff_cache/

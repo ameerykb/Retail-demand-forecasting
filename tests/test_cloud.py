@@ -21,8 +21,9 @@ def bundle_dir(tmp_path_factory):
     raw = standardize_rossmann(*make_rossmann_like(n_stores=4, n_days=300))
     df, cols = make_features(raw, horizon=H)
     model = train_lgbm(df, cols, {"n_estimators": 20})
+    qmodels = {q: train_lgbm(df, cols, {"n_estimators": 20}, quantile=q) for q in (0.1, 0.9)}
     return save_bundle(model, cols, raw, H, tmp_path_factory.mktemp("b") / "forecaster",
-                       trained_on="synthetic-test")
+                       trained_on="synthetic-test", quantile_models=qmodels)
 
 
 class FakeS3:
@@ -48,11 +49,12 @@ def test_download_bundle_fetches_all_files_then_caches(bundle_dir, tmp_path):
     s3 = FakeS3(bundle_dir)
     dest = tmp_path / "forecaster"
     download_bundle("s3://models/forecaster", dest, client=s3)
-    assert sorted(s3.calls) == sorted(("models", f"forecaster/{f}") for f in BUNDLE_FILES)
-    assert all((dest / f).exists() for f in BUNDLE_FILES)
+    expected = [*BUNDLE_FILES, "model_q10.txt", "model_q90.txt"]
+    assert sorted(s3.calls) == sorted(("models", f"forecaster/{f}") for f in expected)
+    assert all((dest / f).exists() for f in expected)
 
     download_bundle("s3://models/forecaster", dest, client=s3)   # warm container
-    assert len(s3.calls) == len(BUNDLE_FILES)                     # no second download
+    assert len(s3.calls) == len(expected)                         # no second download
 
 
 def test_load_forecaster_uses_s3_when_configured(bundle_dir, tmp_path, monkeypatch):

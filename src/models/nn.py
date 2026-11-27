@@ -147,7 +147,7 @@ def fit_mlp(train, feature_cols, **kwargs) -> MLPForecaster:
 
     n, history = len(Y), {"train_loss": [], "val_loss": []}
     best_val, best_state, bad = float("inf"), None, 0
-    for epoch in range(cfg["epochs"]):
+    for _epoch in range(cfg["epochs"]):
         model.train()
         perm = torch.randperm(n, generator=gen).to(device)     # shuffle every epoch
         total = torch.zeros((), device=device)

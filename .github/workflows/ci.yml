@@ -9,15 +9,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
           cache: pip
           cache-dependency-path: requirements.txt
       - name: Install CPU-only PyTorch (much smaller than the default build)
-        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+        run: pip install "torch==2.15.0" --index-url https://download.pytorch.org/whl/cpu
       - name: Install dependencies
-        run: pip install -r requirements.txt ruff
+        run: pip install -r requirements.txt
       - name: Lint
         run: ruff check .
+      - name: Scripts run end to end (synthetic data)
+        run: |
+          python -m scripts.train_final --synthetic
+          python -m scripts.baselines
       - name: Run tests
         run: python -m pytest -q
 
@@ -28,11 +32,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
       - name: Train a model on synthetic data
         run: |
           pip install -r requirements-api.txt
-          python train_final.py --synthetic
+          python -m scripts.train_final --synthetic
       - name: Build the image
         run: docker build -t demand-forecast-api .
       - name: Smoke test the container
@@ -52,11 +56,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
       - name: Train a model on synthetic data
         run: |
           pip install -r requirements-api.txt
-          python train_final.py --synthetic
+          python -m scripts.train_final --synthetic
       - name: Build the Lambda image
         run: docker build -f Dockerfile.lambda -t demand-forecast-lambda .
       - name: Smoke test with the Lambda Runtime Interface Emulator

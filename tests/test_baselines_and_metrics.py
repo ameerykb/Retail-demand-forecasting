@@ -3,7 +3,8 @@ import pandas as pd
 from src.metrics import mae, rmse, wape
 from src.models.baselines import naive, seasonal_naive, moving_average
 from src.training.backtest import rolling_backtest
-from src.data.load import load_sales, to_wide
+from src.data.rossmann import standardize_rossmann, to_wide
+from src.data.synthetic import make_rossmann_like
 
 
 def _wide(n=60):
@@ -43,10 +44,15 @@ def test_backtest_uses_only_past_data():
         return np.zeros((horizon, 1))
     res = rolling_backtest(wide, {"m": model}, horizon=10, n_folds=3)
     assert len(res) == 3
-    for seen, cutoff in zip(spy["max_seen"], res["cutoff"]):
+    for seen, cutoff in zip(spy["max_seen"], res["cutoff"], strict=True):
         assert seen.date() < cutoff
 
 
 def test_synthetic_data_shape():
-    wide = to_wide(load_sales())
+    wide = to_wide(standardize_rossmann(*make_rossmann_like(n_stores=5, n_days=730)))
     assert wide.shape == (730, 5) and not wide.isna().any().any()
+
+
+def test_interval_coverage():
+    from src.metrics import interval_coverage
+    assert interval_coverage([1, 5, 10], [0, 6, 9], [2, 7, 11]) == 2 / 3

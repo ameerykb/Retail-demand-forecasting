@@ -31,15 +31,16 @@ Forecasts daily sales for **1,115 Rossmann drugstores, up to 42 days ahead**, wi
 ## ⚡ TL;DR
 
 - **Problem:** forecast each store's daily sales 6 weeks ahead from Kaggle's Rossmann data (1M+ rows, 2013 to July 2015).
-- **Method:** leak-free features (every sales lag at least 42 days old), a **4-fold rolling backtest**, baselines first, then **LightGBM vs a PyTorch MLP**, tracked in MLflow; Optuna tuning on a period the reported backtest never sees.
+- **Method:** leak-free features (every sales lag at least 42 days old), a **4-fold rolling backtest**, baselines first, then **LightGBM vs a PyTorch MLP**, tracked in MLflow; Optuna tuning checked on a period it never saw (it didn't transfer, so the defaults stay).
 - **Result:** LightGBM **WAPE 0.091**, **57% lower error than the best baseline**, and better than the MLP in all four folds.
-- **Uncertainty:** every forecast comes with an **80% range** from quantile models, **conformally calibrated** so that about 8 in 10 real values fall inside it.
+- **Uncertainty:** every forecast comes with an **80% range** from quantile models, **conformally calibrated**: coverage in the backtest went from 69.9% to **81.6%**.
+- **Explainability:** SHAP shows **promotions** and the store's recent sales level drive the forecast most.
 - **Production:** FastAPI + Pydantic, Docker, **AWS Lambda + API Gateway + S3**, infrastructure in **Terraform**, JSON request logs in CloudWatch.
 - **Quality:** 48 tests (including a train/serve consistency test), CI that also runs the Lambda image in AWS's emulator and validates Terraform, pinned dependencies, Dependabot.
 
 | 🏪 Stores | 📅 Horizon | 📉 Error vs best baseline | 🎯 Interval | ✅ Tests |
 |:---:|:---:|:---:|:---:|:---:|
-| **1,115** | **42 days** | **57% lower** | **80%, calibrated** | **48 passing** |
+| **1,115** | **42 days** | **57% lower** | **81.6% coverage** | **48 passing** |
 
 > **Scope:** the model is trained on historical Kaggle data (2013 to July 2015) and served live on AWS as a demo, so its forecasts cover August–September 2015. Results describe this dataset and this backtest only.
 
@@ -101,12 +102,38 @@ A single number hides how sure the model is. Each forecast also has an **80% ran
 
 1. Two extra LightGBM models predict the 10th and 90th percentiles (quantile loss) instead of the mean.
 2. Quantile models are usually too narrow, so the range is **calibrated with conformalized quantile regression (CQR)**: on the most recent 42 days before the cutoff, measure how far real values fall outside the range (in log space, so the correction is a percentage that fits small and large stores) and widen by the 80th percentile of those misses.
-3. `scripts/evaluate_intervals.py` checks the coverage in the same rolling backtest, before and after calibration (target 0.80). On synthetic data calibration moved coverage from 0.62 to 0.79.
+3. `scripts/evaluate_intervals.py` measures the coverage in the same 4-fold rolling backtest.
 
-### Tuning and explainability
+| Fold (cutoff) | Raw coverage | **Calibrated coverage** | Avg. width (raw → calibrated) |
+|---|---:|---:|---:|
+| 0 (2015-02-14) | 73.1% | **88.9%** | 1,432 → 2,119 |
+| 1 (2015-03-28) | 67.8% | **73.8%** | 1,750 → 2,013 |
+| 2 (2015-05-09) | 68.5% | **81.1%** | 1,608 → 2,177 |
+| 3 (2015-06-20) | 70.1% | **82.6%** | 1,604 → 2,112 |
+| **Average** | 69.9% | **81.6%** (target 80%) | 1,599 → 2,105 |
 
-- **Tuning:** `scripts/tune_lgbm.py` runs an Optuna search with its own rolling backtest on the data **before** the reported test period, so the reported WAPE stays an honest out-of-sample score. The best parameters are saved to `configs/lgbm_best_params.json` and used by every script.
-- **Explainability:** `scripts/explain.py` computes exact TreeSHAP values with LightGBM (`pred_contrib=True`) on days the model has not seen and charts the average impact of each feature.
+The raw quantile models covered only about 7 in 10 real values; calibration brings the average to the 80% target. Fold 1 stays low: its window covers Easter 2015, when shopping patterns differ from the calibration weeks before it.
+
+### Hyperparameter tuning: an honest negative result
+
+`scripts/tune_lgbm.py` ran 25 Optuna trials (300 sampled stores) with its own rolling backtest on the data **before** the reported test period, so the test period stays unseen.
+
+| | Tuning period (WAPE) | Reported backtest (WAPE) |
+|---|---:|---:|
+| Default parameters | 0.1082 | **0.0912** |
+| Optuna best | 0.1032 | 0.0925 |
+
+The tuned parameters were 4.6% better on the tuning period but **slightly worse on the unseen test period**, so the served model keeps the defaults. The run is kept in [`configs/lgbm_tuning_result.json`](configs/lgbm_tuning_result.json). (Scripts use tuned parameters automatically only if `configs/lgbm_best_params.json` exists.)
+
+### What drives the forecast (SHAP)
+
+`scripts/explain.py` computes exact TreeSHAP values with LightGBM (`pred_contrib=True`) on the last 42 days, which the model did not see in training.
+
+![SHAP feature impact](reports/figures/shap_importance.png)
+
+- **Promotions** have the largest effect on a given day's forecast, followed by the store's **recent sales level** (the 28-day average from 42+ days earlier) and the **store itself**.
+- **Calendar effects** (day of month, day of week) come next; store attributes such as type, assortment and competitor distance add little once the model knows the store's own sales history.
+- LightGBM's default "split count" importance ranks Promotion 14th of 18. A yes/no feature needs few splits but moves predictions a lot; SHAP measures the effect size, so it is the better explanation.
 
 ## 🔍 What the data shows
 
@@ -177,7 +204,7 @@ flowchart LR
 - **Baselines first:** naive, seasonal naive and moving average set the score any model must beat.
 - **Two models:** LightGBM on log(1 + sales), and a PyTorch MLP with learned embeddings, a hand-written training loop, seeded shuffling, AdamW and early stopping.
 - **Calibrated uncertainty:** quantile models plus conformal calibration; the coverage is measured, not assumed.
-- **Honest tuning:** Optuna searches on a period the reported backtest never sees.
+- **Honest tuning:** Optuna searches on a period the reported backtest never sees, and its result is only used if it holds up there (it didn't).
 - **Experiment tracking:** parameters, per-fold metrics and loss curves in MLflow.
 - **Validated API:** Pydantic schemas reject bad input; unknown stores return 404; out-of-range or duplicate dates, bad flags and empty lists return 422.
 - **Train/serve consistency test:** the API must return the same numbers as the offline pipeline.
@@ -317,7 +344,7 @@ CI (`.github/workflows/ci.yml`) runs on every push: lint, tests, the training sc
 - **The quick `/forecast/{store}/default` endpoint assumes no promotions,** so it forecasts lower than a typical month. Use `POST /forecast` with a real schedule.
 - **Missing stores:** about 180 stores have no records from July to December 2014. Some lag features for those stores reach back into that gap in the earliest backtest window and are treated as missing values.
 - **Scoring is not comparable to the Kaggle leaderboard,** which used a different metric (RMSPE) and a different test split.
-- **The interval is calibrated on one recent window;** coverage can drift if demand patterns change. It is a range for one day at a time, not for totals over several days.
+- **The interval is calibrated on one recent window;** coverage drops when the forecast period behaves differently, e.g. 73.8% in the fold covering Easter 2015. It is a range for one day at a time, not for totals over several days.
 - **The MLP trains on slightly less recent data than LightGBM,** because it holds out the last 42 days before each cutoff for early stopping.
 - **Not built yet:** drift monitoring and automated retraining.
 - **Data and licence:** the dataset is not redistributed here. Follow the Kaggle competition rules when using it. Code is under the [MIT License](LICENSE).

@@ -8,6 +8,8 @@ A **sales forecasting system** that predicts daily sales for **1,115 Rossmann dr
 
 **Case study:** Kaggle's *Rossmann Store Sales* data (January 2013 to July 2015).
 
+🌐 **Live API on AWS:** [hgdnakicif.execute-api.ap-southeast-2.amazonaws.com](https://hgdnakicif.execute-api.ap-southeast-2.amazonaws.com/docs) · interactive docs, try `GET /forecast/{store}/default` (the first call after a quiet spell takes a few seconds while Lambda starts)
+
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![LightGBM](https://img.shields.io/badge/LightGBM-Gradient%20Boosting-1C7C54?style=for-the-badge)
 ![PyTorch](https://img.shields.io/badge/PyTorch-Neural%20Network-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)
@@ -34,7 +36,7 @@ A **sales forecasting system** that predicts daily sales for **1,115 Rossmann dr
 
 | 🏪 Stores | 📅 Forecast window | 📉 Error vs best baseline | ✅ Tests |
 |:---:|:---:|:---:|:---:|
-| **1,115** | **42 days** | **57% lower** | **34 passing** |
+| **1,115** | **42 days** | **57% lower** | **35 passing** |
 
 > **Project scope:** this is a portfolio project built on historical data from 2013 to 2015, not a live forecasting system. Results describe this dataset and this backtest only.
 
@@ -344,7 +346,7 @@ CI runs this same emulator check, plus `terraform fmt` and `terraform validate`,
 python -m pytest -q
 ```
 
-The suite has **34 tests** covering metrics and baselines, the no-future-data checks for the backtest and the lag features, the LightGBM and PyTorch models, MLflow logging, the API (including the train/serve consistency check), loading the model from S3 and the Lambda handler (with a fake S3 client, so no AWS account is needed), and the demo helpers.
+The suite has **35 tests** covering metrics and baselines, the no-future-data checks for the backtest and the lag features, the LightGBM and PyTorch models, MLflow logging, the API (including the train/serve consistency check), loading the model from S3 and the Lambda handler (with a fake S3 client, so no AWS account is needed), and the demo helpers.
 
 `.github/workflows/ci.yml` runs the linter and the tests on every push, then builds the Docker image and smoke-tests the container, builds the Lambda image and invokes it through the AWS emulator, and checks the Terraform code. Forecasts from the container matched those from the local API.
 

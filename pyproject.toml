@@ -3,7 +3,7 @@ name = "retail-demand-forecasting"
 version = "1.0.0"
 description = "Daily sales forecasting for 1,115 Rossmann stores: leak-free backtest, LightGBM vs PyTorch, FastAPI on AWS Lambda."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "Ameer Yakoob M T" }]
 
@@ -17,7 +17,7 @@ addopts = "-q"
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 # pyflakes + pycodestyle errors, bugbear (likely bugs), pyupgrade (modern syntax), simplify

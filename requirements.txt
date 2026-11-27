@@ -11,3 +11,4 @@ uvicorn
 httpx
 streamlit
 requests
+mangum

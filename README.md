@@ -15,10 +15,12 @@ A **sales forecasting system** that predicts daily sales for **1,115 Rossmann dr
 ![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-Demo-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Container-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![AWS](https://img.shields.io/badge/AWS-Lambda%20%7C%20S3%20%7C%20ECR-FF9900?style=for-the-badge&logo=amazonwebservices&logoColor=white)
+![Terraform](https://img.shields.io/badge/Terraform-IaC-7B42BC?style=for-the-badge&logo=terraform&logoColor=white)
 
 [![CI](https://github.com/ameerykb/Retail-demand-forecasting/actions/workflows/ci.yml/badge.svg)](https://github.com/ameerykb/Retail-demand-forecasting/actions/workflows/ci.yml)
 
-**[Results](#-results) · [Data insights](#-what-the-data-shows) · [Architecture](#-system-architecture) · [Features](#-key-features) · [Tech Stack](#-technology-stack) · [Getting Started](#-getting-started) · [Testing](#-testing)**
+**[Results](#-results) · [Data insights](#-what-the-data-shows) · [Architecture](#-system-architecture) · [Features](#-key-features) · [Tech Stack](#-technology-stack) · [Getting Started](#-getting-started) · [Deploy to AWS](#-deploy-to-aws) · [Testing](#-testing)**
 
 </div>
 
@@ -32,7 +34,7 @@ A **sales forecasting system** that predicts daily sales for **1,115 Rossmann dr
 
 | 🏪 Stores | 📅 Forecast window | 📉 Error vs best baseline | ✅ Tests |
 |:---:|:---:|:---:|:---:|
-| **1,115** | **42 days** | **57% lower** | **29 passing** |
+| **1,115** | **42 days** | **57% lower** | **34 passing** |
 
 > **Project scope:** this is a portfolio project built on historical data from 2013 to 2015, not a live forecasting system. Results describe this dataset and this backtest only.
 
@@ -168,6 +170,8 @@ flowchart LR
 | API | Python, FastAPI, Pydantic, Uvicorn |
 | Demo | Streamlit |
 | Packaging | Docker, Docker Compose |
+| Cloud | AWS Lambda (container image), API Gateway HTTP API, S3, ECR, CloudWatch, IAM, AWS Budgets, Mangum |
+| Infrastructure as code / CD | Terraform, GitHub Actions with OIDC (no stored AWS keys) |
 | Quality | pytest, Ruff, GitHub Actions |
 | Charts | Matplotlib |
 
@@ -215,9 +219,11 @@ Retail-demand-forecasting/
 ├── run_nn.py                   # PyTorch MLP vs LightGBM vs baselines
 ├── run_eda.py                  # EDA charts
 ├── train_final.py              # train the model used by the API
-├── Dockerfile
+├── Dockerfile                  # container for Docker Compose / any host
+├── Dockerfile.lambda           # container for AWS Lambda
 ├── docker-compose.yml
-└── .github/workflows/ci.yml
+├── infra/terraform/            # AWS infrastructure as code
+└── .github/workflows/          # ci.yml (tests, images, terraform), deploy.yml (AWS)
 ```
 
 ## ⚡ Getting started
@@ -269,15 +275,76 @@ Without the Kaggle files, the scripts fall back to **synthetic data** so the pip
 
 **Download data → Run baselines → Compare models in a rolling backtest → Track in MLflow → Train the final model → Serve with FastAPI → Explore in the Streamlit demo**
 
+## 🌐 Deploy to AWS
+
+The API runs **serverless on AWS**: the same FastAPI app, wrapped with Mangum, runs as a Lambda container image behind an API Gateway HTTP API. The image holds only code; the trained model is kept in a private S3 bucket and downloaded once per Lambda container at cold start. All of it is defined in Terraform and fits within the AWS Free Tier credits.
+
+```mermaid
+flowchart LR
+    U["Client / Streamlit"] -->|HTTPS| G["API Gateway<br/>HTTP API · throttled"]
+    G --> L["Lambda<br/>FastAPI + Mangum<br/>container image"]
+    L -->|cold start: GetObject| S[("S3<br/>model bundle")]
+    E[("ECR<br/>images")] --> L
+    L --> C["CloudWatch Logs"]
+    GH["GitHub Actions<br/>deploy.yml"] -->|OIDC, no keys| E
+    GH -->|update-function-code| L
+```
+
+**What Terraform creates** (`infra/terraform/`): a private, encrypted S3 bucket for the model; an ECR repository that keeps the last 3 images; the Lambda function with a least-privilege role (it can only read the model files); the HTTP API with throttling; 7-day log retention; a monthly AWS Budget with email alerts; and an IAM role that only this repository's `main` branch can assume from GitHub Actions.
+
+**Cost safety:** pick the **Free plan** when you create the AWS account, set `budget_email`, and avoid NAT gateways, RDS and SageMaker endpoints. Lambda and API Gateway only cost anything when called, and the throttling caps how fast anyone can call them. `terraform destroy` removes everything.
+
+**First deploy** (needs the AWS CLI, Terraform and Docker; region `ap-south-1` / Mumbai by default):
+
+```bash
+# 1. Train the model locally on the Kaggle data
+python train_final.py --backtest-wape 0.0912
+
+# 2. Create the bucket and image repository first (the function needs an image to exist)
+cd infra/terraform
+cp terraform.tfvars.example terraform.tfvars      # set budget_email
+terraform init
+terraform apply -target=aws_s3_bucket.model -target=aws_ecr_repository.api
+cd ../..
+
+# 3. Upload the model bundle
+aws s3 sync models/forecaster "$(terraform -chdir=infra/terraform output -raw model_s3_uri)"
+
+# 4. Build and push the Lambda image
+REPO=$(terraform -chdir=infra/terraform output -raw ecr_repository_url)
+aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin "${REPO%%/*}"
+docker buildx build --platform linux/amd64 --provenance=false -f Dockerfile.lambda -t "$REPO:latest" --push .
+
+# 5. Create everything else, then try it
+terraform -chdir=infra/terraform apply
+curl "$(terraform -chdir=infra/terraform output -raw api_url)/health"
+```
+
+Open `<api_url>/docs` for the interactive Swagger page. To point the Streamlit demo at the cloud API, set `API_URL` to the same address.
+
+**Later deploys** go through GitHub Actions: add the repository variables `AWS_REGION`, `AWS_ROLE_ARN` (`github_deploy_role_arn` output), `ECR_REPOSITORY_URL`, `LAMBDA_FUNCTION` and `API_URL` (all printed by `terraform output`), then run **Deploy to AWS** from the Actions tab. It signs in with OIDC, pushes a new image tagged with the commit, updates the function and smoke-tests the live URL.
+
+**After retraining**, only the model changes: run step 3 again. A warm Lambda keeps its copy, so publish a new image (or wait for new containers) to pick it up.
+
+**Test the Lambda image locally** with the emulator built into the AWS base image:
+
+```bash
+docker build -f Dockerfile.lambda -t demand-forecast-lambda .
+docker run -p 9000:8080 -e MODEL_DIR=/models/forecaster -v "$PWD/models:/models:ro" demand-forecast-lambda
+curl -d @infra/events/health.json http://localhost:9000/2015-03-31/functions/function/invocations
+```
+
+CI runs this same emulator check, plus `terraform fmt` and `terraform validate`, on every push.
+
 ## 🧪 Testing
 
 ```powershell
 python -m pytest -q
 ```
 
-The suite has **29 tests** covering metrics and baselines, the no-future-data checks for the backtest and the lag features, the LightGBM and PyTorch models, MLflow logging, the API (including the train/serve consistency check), and the demo helpers.
+The suite has **34 tests** covering metrics and baselines, the no-future-data checks for the backtest and the lag features, the LightGBM and PyTorch models, MLflow logging, the API (including the train/serve consistency check), loading the model from S3 and the Lambda handler (with a fake S3 client, so no AWS account is needed), and the demo helpers.
 
-`.github/workflows/ci.yml` runs the linter and the tests on every push, then builds the Docker image and smoke-tests the container. Forecasts from the container matched those from the local API.
+`.github/workflows/ci.yml` runs the linter and the tests on every push, then builds the Docker image and smoke-tests the container, builds the Lambda image and invokes it through the AWS emulator, and checks the Terraform code. Forecasts from the container matched those from the local API.
 
 ## 🔐 Limitations & responsible use
 

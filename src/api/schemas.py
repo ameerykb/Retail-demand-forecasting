@@ -27,6 +27,8 @@ class ForecastRequest(BaseModel):
 class DayForecast(BaseModel):
     date: dt.date
     predicted_sales: float
+    lower: float | None = Field(None, description="Lower end of the prediction interval")
+    upper: float | None = Field(None, description="Upper end of the prediction interval")
 
 
 class ForecastResponse(BaseModel):
@@ -51,6 +53,10 @@ class ModelInfo(BaseModel):
     n_stores: int
     trained_on: str
     backtest_wape: float | None = None
+    params: str = "default"
+    interval: list[float] | None = Field(
+        None, description="Quantiles of the prediction interval, e.g. [0.1, 0.9] = 80% range")
+    store_ids: list[int]
     features: list[str]
 
 
